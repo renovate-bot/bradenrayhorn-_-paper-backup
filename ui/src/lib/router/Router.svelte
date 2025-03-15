@@ -4,7 +4,7 @@
 
   let RouteComponent = $state<Component | null>(null);
 
-  let lastUri = "";
+  let lastUri: string | undefined = undefined;
 
   export type Route = {
     path: string;
@@ -26,6 +26,10 @@
 
   function updateRoute(uri: string) {
     uri = uri.replace("#", "");
+    if (!uri.startsWith("/")) {
+      uri = "/" + uri;
+    }
+
     if (uri === lastUri) {
       return;
     }

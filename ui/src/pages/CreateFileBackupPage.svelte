@@ -1,7 +1,6 @@
 <script lang="ts">
-  import QRCode from "qrcode";
+  import { onDestroy } from "svelte";
   import PrintView from "../lib/PrintView.svelte";
-  import { writeBarcode, type WriterOptions } from "zxing-wasm/writer";
   import { zxing } from "../zxing";
 
   let files = $state<FileList | null>(null);
@@ -11,22 +10,6 @@
 
   let backup = $state<{ qr: string } | null>(null);
 
-  async function generateQRCodes(text: string) {
-    const chunks = [];
-    for (let i = 0; i < text.length; i += 300) {
-      chunks.push(text.slice(i, i + 300));
-    }
-
-    const qrCodes = [];
-
-    for (const chunk of chunks) {
-      const url = await QRCode.toDataURL(chunk, { errorCorrectionLevel: "M" });
-      qrCodes.push(url);
-    }
-
-    return qrCodes;
-  }
-
   async function doBackup() {
     if (files?.length !== 1 || passphrase.trim().length < 1) {
       error = "Please enter a single file and a passphrase.";
@@ -34,11 +17,10 @@
     }
 
     const bytes = await files[0].bytes();
-    const res = paperBackup(bytes, passphrase);
+    const res = window.paperBackup(bytes, passphrase);
 
     var result = zxing.generateBarcodeFromBinary(
-      //res.qr,
-      new Uint8Array([1, 2, 3, 4]),
+      res.qr,
       "QRCODE",
       "BINARY",
       0,
@@ -48,11 +30,17 @@
     );
 
     const file = URL.createObjectURL(new Blob([result.image]));
-
     backup = { qr: file };
 
     result.delete();
   }
+
+  // cleanup QR code data
+  onDestroy(() => {
+    if (backup?.qr) {
+      URL.revokeObjectURL(backup.qr);
+    }
+  });
 </script>
 
 {#if backup !== null}

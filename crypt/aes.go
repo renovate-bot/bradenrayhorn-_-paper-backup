@@ -87,8 +87,8 @@ func deriveKey(passphrase string, salt []byte) []byte {
 	return argon2.IDKey(
 		[]byte(passphrase),
 		salt,
-		2,
-		1024*1024,
+		8,
+		512*1024,
 		8,
 		32,
 	)

@@ -1,5 +1,16 @@
 #!/bin/bash
 
+ts_nocheck_file() {
+    local file_path="$1"
+    
+    cat /dev/stdin "$file_path" <<EOI > "${file_path}.tmp"
+// @ts-nocheck
+EOI
+
+    mv "${file_path}.tmp" "$file_path"
+}
+
+# copy wasm_exec.js from Go
 cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" ui/src/wasm/
 
 # Get base64 encoding of main.wasm
@@ -14,4 +25,7 @@ WebAssembly.instantiate(wasmBinary.buffer, go.importObject).then((result) => {
   go.run(result.instance);
 });
 EOF
+
+ts_nocheck_file "ui/src/wasm/wasm_exec.js"
+ts_nocheck_file "ui/src/wasm/load.js"
 

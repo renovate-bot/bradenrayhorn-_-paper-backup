@@ -29,7 +29,7 @@ func paperBackup(this js.Value, args []js.Value) any {
 	data := make([]byte, length)
 	js.CopyBytesToGo(data, dataUInt8Array)
 
-	text, qr, err := EncodeBackup([]byte(data), passphrase)
+	text, qr, err := EncodeBackup(data, passphrase)
 	if err != nil {
 		return makeJsError(err)
 	}
@@ -47,9 +47,17 @@ func paperBackup(this js.Value, args []js.Value) any {
 
 func paperBackupDecodeQR(this js.Value, args []js.Value) any {
 	key := args[0].String()
-	input := args[1].String()
+	dataUInt8Array := args[1]
 
-	data, err := DecodeBackupFromQR(input, key)
+	if dataUInt8Array.Type() != js.TypeObject || dataUInt8Array.Get("constructor").Get("name").String() != "Uint8Array" {
+		return makeJsError(errors.New("data must be uint8array"))
+	}
+
+	length := dataUInt8Array.Length()
+	data := make([]byte, length)
+	js.CopyBytesToGo(data, dataUInt8Array)
+
+	data, err := DecodeBackupFromQR(data, key)
 	if err != nil {
 		return makeJsError(err)
 	}

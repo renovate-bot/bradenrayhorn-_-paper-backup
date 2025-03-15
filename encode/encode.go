@@ -1,7 +1,6 @@
 package encode
 
 import (
-	"encoding/base64"
 	"encoding/binary"
 	"fmt"
 	"hash/crc32"
@@ -80,14 +79,6 @@ func FromText(data string) ([]byte, error) {
 	}
 
 	return decodedSecret, nil
-}
-
-func ToQR(data []byte) string {
-	return base64.RawStdEncoding.EncodeToString(data)
-}
-
-func FromQR(data string) ([]byte, error) {
-	return base64.RawStdEncoding.DecodeString(data)
 }
 
 func createChecksum(secret string) []byte {

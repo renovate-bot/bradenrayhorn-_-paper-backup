@@ -24,13 +24,8 @@ func EncodeBackup(data []byte, key string) (string, []byte, error) {
 	return textEncoding, encrypted, nil
 }
 
-func DecodeBackupFromQR(data string, key string) ([]byte, error) {
-	decoded, err := encode.FromQR(data)
-	if err != nil {
-		return nil, err
-	}
-
-	decrypted, err := crypt.Decrypt(key, decoded)
+func DecodeBackupFromQR(data []byte, key string) ([]byte, error) {
+	decrypted, err := crypt.Decrypt(key, data)
 	if err != nil {
 		return nil, err
 	}
