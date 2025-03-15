@@ -8,19 +8,46 @@ import (
 	"github.com/bradenrayhorn/paper-backup/encode"
 )
 
-func EncodeBackup(data []byte, key string) (string, string, error) {
+func EncodeBackup(data []byte, key string) (string, []byte, error) {
 	compressed, err := compress.Compress(data)
 	if err != nil {
-		return "", "", fmt.Errorf("compressing: %w", err)
+		return "", nil, fmt.Errorf("compressing: %w", err)
 	}
 
 	encrypted, err := crypt.Encrypt(key, compressed)
 	if err != nil {
-		return "", "", fmt.Errorf("encrypting: %w", err)
+		return "", nil, fmt.Errorf("encrypting: %w", err)
 	}
 
 	textEncoding := encode.ToText(encrypted)
-	qrEncoding := encode.ToQR(encrypted)
 
-	return textEncoding, qrEncoding, nil
+	return textEncoding, encrypted, nil
+}
+
+func DecodeBackupFromQR(data string, key string) ([]byte, error) {
+	decoded, err := encode.FromQR(data)
+	if err != nil {
+		return nil, err
+	}
+
+	decrypted, err := crypt.Decrypt(key, decoded)
+	if err != nil {
+		return nil, err
+	}
+
+	return compress.Decompress(decrypted)
+}
+
+func DecodeBackupFromText(data string, key string) ([]byte, error) {
+	decoded, err := encode.FromText(data)
+	if err != nil {
+		return nil, err
+	}
+
+	decrypted, err := crypt.Decrypt(key, decoded)
+	if err != nil {
+		return nil, err
+	}
+
+	return compress.Decompress(decrypted)
 }

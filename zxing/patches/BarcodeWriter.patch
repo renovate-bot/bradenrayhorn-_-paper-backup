@@ -1,0 +1,126 @@
+diff --git a/wrappers/wasm/BarcodeWriter.cpp b/wrappers/wasm/BarcodeWriter.cpp
+index ed2a2b1..8ec218a 100644
+--- a/wrappers/wasm/BarcodeWriter.cpp
++++ b/wrappers/wasm/BarcodeWriter.cpp
+@@ -49,36 +49,38 @@ public:
+ 
+ WriteResult generateBarcode(std::wstring text, std::string format, std::string encoding, int margin, int width, int height, int eccLevel)
+ {
+-	using namespace ZXing;
+-	try {
+-		auto barcodeFormat = BarcodeFormatFromString(format);
+-		if (barcodeFormat == BarcodeFormat::None)
+-			return {"Unsupported format: " + format};
+-
+-		MultiFormatWriter writer(barcodeFormat);
+-		if (margin >= 0)
+-			writer.setMargin(margin);
+-
+-		CharacterSet charset = CharacterSetFromString(encoding);
+-		if (charset != CharacterSet::Unknown)
+-			writer.setEncoding(charset);
+-
+-		if (eccLevel >= 0 && eccLevel <= 8)
+-			writer.setEccLevel(eccLevel);
+-
+-		auto buffer = ToMatrix<uint8_t>(writer.encode(text, width, height));
+-
+-		int len;
+-		uint8_t* bytes = stbi_write_png_to_mem(buffer.data(), 0, buffer.width(), buffer.height(), 1, &len);
+-		if (bytes == nullptr)
+-			return {"Unknown error"};
+-
+-		return {std::make_shared<ImageData>(bytes, len)};
+-	} catch (const std::exception& e) {
+-		return {e.what()};
+-	} catch (...) {
+-		return {"Unknown error"};
+-	}
++    using namespace ZXing;
++    try {
++        auto barcodeFormat = BarcodeFormatFromString(format);
++        if (barcodeFormat == BarcodeFormat::None)
++            return {"Unsupported format: " + format};
++
++        MultiFormatWriter writer(barcodeFormat);
++        if (margin >= 0)
++            writer.setMargin(margin);
++
++        CharacterSet charset = CharacterSetFromString(encoding);
++        if (charset != CharacterSet::Unknown)
++            writer.setEncoding(charset);
++
++        if (eccLevel >= 0 && eccLevel <= 8)
++            writer.setEccLevel(eccLevel);
++
++        // Create a BitMatrix from the encoded data
++        auto matrix = ToMatrix<uint8_t>(writer.encode(text, width, height));
++
++        // Convert to PNG
++        int len;
++        uint8_t* bytes = stbi_write_png_to_mem(matrix.data(), 0, matrix.width(), matrix.height(), 1, &len);
++        if (bytes == nullptr)
++            return {"Failed to create PNG data"};
++
++        return {std::make_shared<ImageData>(bytes, len)};
++    } catch (const std::exception& e) {
++        return {e.what()};
++    } catch (...) {
++        return {"Unknown error"};
++    }
+ }
+ 
+ EMSCRIPTEN_BINDINGS(BarcodeWriter)
+@@ -91,4 +93,52 @@ EMSCRIPTEN_BINDINGS(BarcodeWriter)
+ 	    ;
+ 
+ 	function("generateBarcode", &generateBarcode);
++
++	// Add this to the EMSCRIPTEN_BINDINGS section
++	function("generateBarcodeFromBinary", optional_override([](emscripten::val binaryData, std::string format, std::string encoding, int margin, int width, int height, int eccLevel) {
++		using namespace ZXing;
++		try {
++			auto barcodeFormat = BarcodeFormatFromString(format);
++			if (barcodeFormat == BarcodeFormat::None)
++				return WriteResult{"Unsupported format: " + format};
++
++			// Convert JS typed array to C++ vector
++			auto length = binaryData["length"].as<size_t>();
++			std::vector<uint8_t> bytes(length);
++			emscripten::val memoryView = emscripten::val::global("Uint8Array").new_(emscripten::val::global("Math")["floor"](length));
++			memoryView.call<void>("set", binaryData);
++
++			for (size_t i = 0; i < length; ++i) {
++				bytes[i] = memoryView[i].as<uint8_t>();
++			}
++
++			MultiFormatWriter writer(barcodeFormat);
++			if (margin >= 0)
++				writer.setMargin(margin);
++
++			writer.setEncoding(CharacterSet::BINARY);
++
++			if (eccLevel >= 0 && eccLevel <= 8)
++				writer.setEccLevel(eccLevel);
++
++			// Create wide string from binary data
++			std::wstring binaryText;
++			for (uint8_t byte : bytes) {
++				binaryText.push_back(static_cast<wchar_t>(byte));
++			}
++
++			auto matrix = ToMatrix<uint8_t>(writer.encode(binaryText, width, height));
++
++			int len;
++			uint8_t* pngBytes = stbi_write_png_to_mem(matrix.data(), 0, matrix.width(), matrix.height(), 1, &len);
++			if (pngBytes == nullptr)
++				return WriteResult{"Failed to create PNG data"};
++
++			return WriteResult{std::make_shared<ImageData>(pngBytes, len)};
++		} catch (const std::exception& e) {
++			return WriteResult{e.what()};
++		} catch (...) {
++			return WriteResult{"Unknown error"};
++		}
++	}));
+ }

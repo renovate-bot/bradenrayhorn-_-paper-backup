@@ -9,6 +9,8 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
+const saltLength = 16
+
 func Encrypt(passphrase string, data []byte) ([]byte, error) {
 	salt := make([]byte, 48)
 	if _, err := rand.Read(salt); err != nil {
@@ -33,16 +35,32 @@ func Encrypt(passphrase string, data []byte) ([]byte, error) {
 	}
 
 	encrypted := gcm.Seal(nil, nonce, data, nil)
-	return append(append(salt, nonce...), encrypted...), nil
+
+	result := encodeHeader(passphrase, typeSingleFileAES256_V1)
+	result = append(result, salt...)
+	result = append(result, nonce...)
+	result = append(result, encrypted...)
+
+	return result, nil
 }
 
-func Decrypt(passphrase string, encrypted []byte) ([]byte, error) {
-	if len(encrypted) < 49 {
+func Decrypt(passphrase string, data []byte) ([]byte, error) {
+	kind, err := decodeHeader(passphrase, data)
+	if err != nil {
+		return nil, err
+	}
+
+	if kind != typeSingleFileAES256_V1 {
+		return nil, fmt.Errorf("cannot handle type %d", kind)
+	}
+
+	encrypted := stripHeader(data)
+	if len(encrypted) < saltLength+1 {
 		return nil, fmt.Errorf("crypto data invalid")
 	}
 
-	salt := encrypted[:48]
-	encrypted = encrypted[48:]
+	salt := encrypted[:saltLength]
+	encrypted = encrypted[saltLength:]
 
 	key := deriveKey(passphrase, salt)
 
@@ -69,7 +87,7 @@ func deriveKey(passphrase string, salt []byte) []byte {
 	return argon2.IDKey(
 		[]byte(passphrase),
 		salt,
-		8,
+		2,
 		1024*1024,
 		8,
 		32,

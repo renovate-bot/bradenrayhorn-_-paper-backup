@@ -11,6 +11,8 @@ func main() {
 	c := make(chan struct{}, 0)
 
 	js.Global().Set("paperBackup", js.FuncOf(paperBackup))
+	js.Global().Set("paperBackupDecodeQR", js.FuncOf(paperBackupDecodeQR))
+	js.Global().Set("paperBackupDecodeText", js.FuncOf(paperBackupDecodeText))
 
 	<-c
 }
@@ -35,9 +37,40 @@ func paperBackup(this js.Value, args []js.Value) any {
 	// assemble response
 	obj := map[string]any{}
 	obj["text"] = text
-	obj["qr"] = qr
+
+	array := js.Global().Get("Uint8Array").New(len(qr))
+	js.CopyBytesToJS(array, qr)
+	obj["qr"] = array
 
 	return js.ValueOf(obj)
+}
+
+func paperBackupDecodeQR(this js.Value, args []js.Value) any {
+	key := args[0].String()
+	input := args[1].String()
+
+	data, err := DecodeBackupFromQR(input, key)
+	if err != nil {
+		return makeJsError(err)
+	}
+
+	array := js.Global().Get("Uint8Array").New(len(data))
+	js.CopyBytesToJS(array, data)
+	return array
+}
+
+func paperBackupDecodeText(this js.Value, args []js.Value) any {
+	key := args[0].String()
+	input := args[1].String()
+
+	data, err := DecodeBackupFromText(input, key)
+	if err != nil {
+		return makeJsError(err)
+	}
+
+	array := js.Global().Get("Uint8Array").New(len(data))
+	js.CopyBytesToJS(array, data)
+	return array
 }
 
 func makeJsError(err error) js.Value {

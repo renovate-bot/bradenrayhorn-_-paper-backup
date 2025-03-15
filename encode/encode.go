@@ -3,7 +3,9 @@ package encode
 import (
 	"encoding/base64"
 	"encoding/binary"
+	"fmt"
 	"hash/crc32"
+	"strings"
 )
 
 const maxLineSize = 80
@@ -33,8 +35,59 @@ func ToText(data []byte) string {
 	return formatted
 }
 
+func FromText(data string) ([]byte, error) {
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+
+	if len(lines) < 2 {
+		return nil, fmt.Errorf("invalid format. requires at least two lines")
+	}
+
+	secret := ""
+	for j, line := range lines[:len(lines)-1] {
+		stripped := strings.ReplaceAll(line, " ", "")
+		if len(stripped) < 10 {
+			return nil, fmt.Errorf("invalid format. at line %d", j+1)
+		}
+
+		foundChecksum := stripped[len(stripped)-8:]
+		foundSecret := stripped[:len(stripped)-8]
+		secret += foundSecret
+
+		// validate checksum for line
+		decodedChecksum, err := hexrDecode([]byte(foundChecksum))
+		if err != nil {
+			return nil, err
+		}
+		if !verifyChecksum(foundSecret, decodedChecksum) {
+			return nil, fmt.Errorf("checksum failed. at line %d", j+1)
+		}
+	}
+
+	// validate share checksum
+	shareChecksum := strings.TrimSpace(strings.ReplaceAll(lines[len(lines)-1], " ", ""))
+	decodedChecksum, err := hexrDecode([]byte(shareChecksum))
+	if err != nil {
+		return nil, err
+	}
+	if !verifyChecksum(secret, decodedChecksum) {
+		return nil, fmt.Errorf("file checksum failed")
+	}
+
+	// decode line secret and add to full secret
+	decodedSecret, err := hexrDecode([]byte(secret))
+	if err != nil {
+		return nil, err
+	}
+
+	return decodedSecret, nil
+}
+
 func ToQR(data []byte) string {
 	return base64.RawStdEncoding.EncodeToString(data)
+}
+
+func FromQR(data string) ([]byte, error) {
+	return base64.RawStdEncoding.DecodeString(data)
 }
 
 func createChecksum(secret string) []byte {
